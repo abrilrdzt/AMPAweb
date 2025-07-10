@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AMPA Receptor Kinetic Simulator</title>
+    <style>
+        body { font-family: 'Playfair Display', sans-serif; margin: 20px; background-color: #C8D8E1;color: #2C2C2C; }
+        h1, h2, h3, h4, h5, h6 {
+        color: #2B6777;}
+        .container { width: 100%; max-width: none; margin: 0 auto; padding: 0; }
+        .section { margin: 0 auto; padding: 20px 20px;background-color: white; border-radius: 0; width: 100vw; box-sizing: border-box;}
+        .tall-section {min-height: 85vh;}
+        .section + .section {margin-top: 40px;}
+        .param-group { display: flex; flex-wrap: wrap; gap: 10px; }
+        .param { display: flex; align-items: center; gap: 5px; }
+        label { min-width: 200px; }
+        input[type="text"], select { padding: 5px; }
+        button { padding: 10px 20px; background-color: #2B6777; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #225262; }
+        .console { background-color: #f8f8f8; padding: 10px; height: 150px; overflow-y: scroll; border: 1px solid #ccc; }
+        .error { color: red; }
+        img { max-width: 100%; }
+        .plot-image {
+        display: block;
+        width: 100vw;
+        height: auto;
+        margin: 0 auto;}
+        body.fullscreen-plot {
+        margin: 0;
+        padding: 0;}
+        .diagram-container {position: relative; max-width: 1100px; width: 100%; margin: 30px auto 0 auto;}
+        .ampa-diagram {width: 100%; height: auto; display: block;transform: scale(1.1); transform-origin: center;}
+        .rate-input {position: absolute;width: 75px;padding: 2px;font-size: 12px;text-align: center;}
+        .rate-unit {position: absolute;font-size: 13px;background-color: rgba(255, 255, 255, 0.8);padding-left: 2px;}
+       
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AMPA Receptor Kinetic Simulator</h1>
+        <form method="POST">
+            <div class="section tall-section">
+                <h2>Step 1: Transition-Rate Parameters</h2>
+                <div class="diagram-container">
+                    <img src="{{ url_for('static', filename='ampa_diagram.png') }}" alt="AMPA Diagram" class="ampa-diagram">
+                    {% for key, (x, y) in rate_coords.items() %}
+                        <input type="text" name="{{ key }}" value="{{ default_params[key] }}" class="rate-input" style="left: {{ x * 1.5 }}px; top: {{ y * 1.5 }}px;">
+                        <span class="rate-unit" style="left: {{ (x + 60) * 1.5 }}px; top: {{ (y + 5) * 1.5 }}px;">{{ get_unit_for_rate(key) }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="section">
+                <h2>Step 2: Choose Simulation & General Parameters</h2>
+                <div class="param">
+                    <label>Simulation Type:</label>
+                    <select name="simulation_type">
+                        <option value="Dose Response">Dose Response</option>
+                        <option value="Long Paired-Pulse Recovery">Long Paired-Pulse Recovery</option>
+                        <option value="Short Paired-Pulse Recovery">Short Paired-Pulse Recovery</option>
+                        <option value="Steady-State Inactivation">Steady-State Inactivation</option>
+                    </select>
+                </div>
+                {% for key in ['∆t', 'Agonist Concentration', 'Pulse Duration', 'Conductance O2', 'Conductance O3', 'Conductance O4'] %}
+                    <div class="param">
+                        <label>{{ key }}:</label>
+                        <input type="text" name="{{ key }}" value="{{ default_params[key] * (1000 if key in ['∆t', 'Pulse Duration'] else 1000 if key == 'Agonist Concentration' else 1e12 if key in ['Conductance O2', 'Conductance O3', 'Conductance O4'] else 1) }}">
+                        <select name="unit_{{ key }}">
+                            {% if key in ['∆t', 'Pulse Duration'] %}
+                                <option value="s">s</option>
+                                <option value="ms" selected>ms</option>
+                            {% elif key == 'Agonist Concentration' %}
+                                <option value="M">M</option>
+                                <option value="mM" selected>mM</option>
+                            {% else %}
+                                <option value="S">S</option>
+                                <option value="pS" selected>pS</option>
+                            {% endif %}
+                        </select>
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="section" id="specific-params">
+                <h2>Step 3: Simulation-Specific Parameters</h2>
+                <div id="dr-params">
+                    {% for key in ['Maximum time', 'Agonist starting time', 'Agonist ending time', 'Agonist concentrations'] %}
+                        <div class="param">
+                            <label>{{ key }}:</label>
+                            <input type="text" name="{{ key }}" value="{{ default_params[key] * (1000 if key in ['Maximum time', 'Agonist starting time', 'Agonist ending time'] else 1) }}">
+                            {% if key in ['Maximum time', 'Agonist starting time', 'Agonist ending time'] %}
+                                <select name="unit_{{ key }}">
+                                    <option value="s">s</option>
+                                    <option value="ms" selected>ms</option>
+                                </select>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+                <div id="lppr-params" style="display: none;">
+                    {% for key in ['Starting time (baseline pulse) Long Paired Pulse', 'Buffer time', 'Pulse intervals (long)'] %}
+                        <div class="param">
+                            <label>{{ key }}:</label>
+                            <input type="text" name="{{ key }}" value="{{ default_params[key] * (1000 if key in ['Starting time (baseline pulse) Long Paired Pulse', 'Buffer time'] else 1) }}">
+                            {% if key in ['Starting time (baseline pulse) Long Paired Pulse', 'Buffer time'] %}
+                                <select name="unit_{{ key }}">
+                                    <option value="s">s</option>
+                                    <option value="ms" selected>ms</option>
+                                </select>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+                <div id="sppr-params" style="display: none;">
+                    {% for key in ['Starting time (baseline pulse) Short Paired Pulse', 'Buffer time', 'Pulse intervals (short)'] %}
+                        <div class="param">
+                            <label>{{ key }}:</label>
+                            <input type="text" name="{{ key }}" value="{{ default_params[key] * (1000 if key in ['Starting time (baseline pulse) Short Paired Pulse', 'Buffer time'] else 1) }}">
+                            {% if key in ['Starting time (baseline pulse) Short Paired Pulse', 'Buffer time'] %}
+                                <select name="unit_{{ key }}">
+                                    <option value="s">s</option>
+                                    <option value="ms" selected>ms</option>
+                                </select>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+                <div id="ssi-params" style="display: none;">
+                    {% for key in ['Baseline duration', 'Baseline agonist concentrations'] %}
+                        <div class="param">
+                            <label>{{ key }}:</label>
+                            <input type="text" name="{{ key }}" value="{{ default_params[key] * (1000 if key == 'Baseline duration' else 1) }}">
+                            {% if key == 'Baseline duration' %}
+                                <select name="unit_{{ key }}">
+                                    <option value="s">s</option>
+                                    <option value="ms" selected>ms</option>
+                                </select>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <button type="submit">Run Simulation</button>
+        </form>
+        <div class="results-container">
+        {% if output %}
+            <div class="params-container">
+                <h2>Console Output</h2>
+                <div class="console">{{ output }}</div>
+            </div>
+        {% endif %}
+        {% if plot_file %}
+            <div class="plot-container">
+                <h2>Simulation Plot</h2>
+                <img src="{{ url_for('static', filename=plot_file) }}" alt="Simulation Plot" class="plot-image">
+            </div>
+        {% endif %}
+        {% if csv_file %}
+            <div class="params-container">
+                <h2>Download Data</h2>
+                <a href="{{ url_for('static', filename=csv_file) }}" download>Download CSV</a>
+            </div>
+        {% endif %}
+        {% if plot_file %}
+            <div class="params-container">
+                <h2>Download Plot Image</h2>
+                <a href="{{ url_for('static', filename=plot_file) }}" download>Download Plot</a>
+            </div>
+        {% endif %}
+    </div>
+    <script>
+        document.querySelector('select[name="simulation_type"]').addEventListener('change', function() {
+            document.getElementById('dr-params').style.display = this.value === 'Dose Response' ? 'block' : 'none';
+            document.getElementById('lppr-params').style.display = this.value === 'Long Paired-Pulse Recovery' ? 'block' : 'none';
+            document.getElementById('sppr-params').style.display = this.value === 'Short Paired-Pulse Recovery' ? 'block' : 'none';
+            document.getElementById('ssi-params').style.display = this.value === 'Steady-State Inactivation' ? 'block' : 'none';
+        });
+    </script>
+</body>
+</html>
