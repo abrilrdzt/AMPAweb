@@ -191,8 +191,10 @@ def run_dr(params):
     try:
         arr = [float(x) for x in glu_str.split(',') if x.strip() != ""]
         gluts = np.array(arr, dtype=np.float64) / 1e6
-    except:
+        print(f"Parsed Agonist concentrations: {arr} µM")
+    except Exception as e:
         # Fall back to defaults if parse fails
+        print(f"Error parsing Agonist concentrations ('{glu_str}'): {e}, using default")
         gluts = np.array([1,10,25,50,100,200,250,500,750,1000,2000,5000,10000], dtype=np.float64) / 1e6
 
     total_time = np.arange(0, tmax + dt, dt)
@@ -297,7 +299,9 @@ def run_ppr_sppr(params, is_sppr=False):
         try:
             arr = [float(x) for x in s.split(',') if x.strip() != ""]
             pulse_intervals = np.array(arr, dtype=np.float64) / 1000.0
-        except:
+            print(f"Parsed Pulse intervals (short): {arr} ms")
+        except Exception as e:
+            print(f"Error parsing Pulse intervals (short) ('{s}'): {str(e)}, using default")
             pulse_intervals = np.unique(np.round(np.logspace(np.log10(2), np.log10(1000), 70)).astype(int))[:50] / 1000.0
     else:
         s = params['Pulse intervals (long)']
@@ -507,7 +511,9 @@ def run_ssi(params):
         arr = [float(x) for x in s.split(',') if x.strip() != ""]
         bas_nM = np.array(arr, dtype=np.float64)
         bas_M = bas_nM / 1e9
-    except:
+        print(f"Parsed Baseline agonist concentrations: {arr} nM")
+    except Exception as e:
+        print(f"Error parsing Baseline agonist concentrations ('{s}'): {str(e)}, using default")
         bas_M = np.array([1,10,50,100,200,600,1000,1600,2000,2500,5000,10000,12500], dtype=np.float64) / 1e9
 
     pulse_glu = float(params['Agonist Concentration'])

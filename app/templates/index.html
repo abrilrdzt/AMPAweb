@@ -37,6 +37,15 @@
     </style>
 </head>
 <body>
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        <ul class="error">
+            {% for message in messages %}
+                <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+{% endwith %}
     <div class="container">
         <h1>AMPA Receptor Kinetic Simulator</h1>
         <form method="POST">
@@ -177,6 +186,6 @@
     </script>
 </body>
 <footer class="bottom-right-name">
-  Created by Abril Rodriguez and Sarah Mory
+  Created by Abril Rodriguez, Sarah Mory and Ekin Celtikcioglu
 </footer>
 </html>
