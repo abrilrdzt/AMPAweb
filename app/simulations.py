@@ -71,7 +71,7 @@ default_params = {
 
     # SSI‐specific
     'Baseline duration': 2.0,    # (s)
-    'Baseline agonist concentrations': "1,10,50,100,200,600,1000,1600,2000,2500,5000,10000,12500"
+    'Baseline agonist concentrations': "1,10,50,100,200,600,1000,1600,2000,2500,5000,10000,12500",
     
     #Train-specific
     'Train frequencies (Hz)': "10,25,50,100,200",
