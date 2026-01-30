@@ -204,12 +204,13 @@ def index():
                 errors.append("Missing Train frequencies, using default")
             else:
                 try:
-                    _ = [float(x) for x in val.split(',') if x.strip()]
+                    freq_list = [float(x) for x in val.split(',') if x.strip()]
+                    if any(f <= 0 for f in freq_list):
+                        raise ValueError("Frequencies must be positive")
                     params['Train frequencies (Hz)'] = val
-                except ValueError:
+                except ValueError as ve:
                     params['Train frequencies (Hz)'] = default_params['Train frequencies (Hz)']
-                    errors.append("Invalid Train frequencies format, using default")
-
+                    errors.append(f"Invalid Train frequencies format or values ('{val}'): {str(ve)}, using default")
             # Scalar params
             for key in ['Number of pulses', 'Pre time', 'Post time', 'Pulse width']:
                 val = request.form.get(key, '').strip()
@@ -220,11 +221,12 @@ def index():
                 else:
                     try:
                         val_f = float(val)
+                        if val_f <= 0:
+                            raise ValueError(f"{key} must be positive")
                         params[key] = val_f if unit == 's' else val_f / 1000.0
-                    except ValueError:
+                    except ValueError as ve:
                         params[key] = default_params[key]
-                        errors.append(f"Invalid value for {key}, using default")
-
+                        errors.append(f"Invalid value for {key} ('{val}'): {str(ve)}, using default")
             plot_file = 'train.png'
             csv_file = 'ephys_train_sim_stride10.csv'
 
@@ -249,10 +251,13 @@ def index():
                     output = run_ssi(params)
                 elif sim_type == 'Train':
                     output = run_train(params)
-            output += f.getvalue()
+            captured_output = f.getvalue()
+            output += captured_output
+            print(f"Captured simulation output: {captured_output}")  # For debugging
         except Exception as e:
             flash(f"Simulation error: {str(e)}")
             output = f"Simulation error: {str(e)}"
+            print(f"Simulation exception: {str(e)}")  # Log error        
 
     return render_template('index.html',
                           default_params=default_params,

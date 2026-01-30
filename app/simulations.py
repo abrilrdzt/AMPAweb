@@ -645,17 +645,15 @@ def simulate_train(M_on, M_off, is_on, GO2, GO3, GO4):
     return G, Pop
 
 def run_train(params):
+    from flask import current_app
+    import os
     t0 = time_module.perf_counter()
-
     # Parse frequencies
     s = params['Train frequencies (Hz)']
     freqs = np.array([float(x) for x in s.split(',') if x.strip() != ""])
-
     print("⏳ Precomputing transition matrices for TRAIN…")
     M_on, M_off = precompute_transition_matrices_TRAIN(params)
-
     sweeps = [build_train_sweep(f, params) for f in freqs]
-
     print("⏳ Running TRAIN simulations…")
     with parallel_backend("threading", n_jobs=4):
         results = Parallel()(
@@ -667,11 +665,9 @@ def run_train(params):
             )
             for (_, is_on) in sweeps
         )
-
     t_list = [sweeps[i][0] for i in range(len(freqs))]
     G_list = [r[0] for r in results]
     P_list = [r[1] for r in results]
-
     # --------------------------------------------------
     # Pulse ratios (normalized to pulse 1)
     # --------------------------------------------------
@@ -680,32 +676,102 @@ def run_train(params):
     pre = params['Pre time']
     pulse_width = params['Pulse width']
     n_pulses = params['Number of pulses']
-
     for idx, f in enumerate(freqs):
         isi = 1.0 / f
         G = G_list[idx]
         ratios = np.zeros(n_pulses)
-
         for p in range(n_pulses):
             t0p = pre + p * isi
             t1p = t0p + pulse_width
-            i0 = int(t0p / dt)
-            i1 = int(t1p / dt)
-            # ensure indices are within bounds
+            i0 = int(round(t0p / dt))  # Safer rounding
+            i1 = int(round(t1p / dt))
             i0 = max(0, i0)
-            i1 = min(len(G), i1) if i1 > i0 else i0 + 1
-            if i1 > i0:
-                ratios[p] = np.max(G[i0:i1])
-            else:
+            i1 = min(len(G), i1)
+            if i1 <= i0:
                 ratios[p] = 0.0
+            else:
+                ratios[p] = np.max(G[i0:i1])
         if ratios[0] > 0:
             ratios /= ratios[0]
         else:
             ratios /= 1.0
-
         pulse_ratios_all.append(np.clip(ratios, 0.0, 1.0))
-
     t1 = time_module.perf_counter()
     print(f"✅ TRAIN completed in {(t1 - t0):.3f}s")
-
-    return freqs, t_list, G_list, P_list, pulse_ratios_all
+    # Save CSV
+    def save_train_csv(filename, freqs, t_list, G_list, pulse_ratios_all, stride=10):
+        t_ds = [t[::stride] for t in t_list]
+        G_ds = [G[::stride] for G in G_list]
+        lengths = [len(t) for t in t_ds]
+        maxlen = max(lengths)
+        header = []
+        for f in freqs:
+            header.append(f"time_{int(f)}Hz_s")
+            header.append(f"G_{int(f)}Hz_pS")
+        header.append("")
+        header.append("pulse_number")
+        for f in freqs:
+            header.append(f"{int(f)}Hz_ratio")
+        with open(filename, "w", newline="") as fh:
+            fh.write("# Train simulation results\n")
+            fh.write(",".join(header) + "\n")
+            for row in range(maxlen):
+                fields = []
+                for i in range(len(freqs)):
+                    if row < lengths[i]:
+                        fields.append(f"{t_ds[i][row]:.9g}")
+                        fields.append(f"{G_ds[i][row]:.9g}")
+                    else:
+                        fields.append("")
+                        fields.append("")
+                fields.append("")
+                if row < n_pulses:
+                    fields.append(str(row + 1))
+                    for i in range(len(freqs)):
+                        fields.append(f"{pulse_ratios_all[i][row]:.9g}")
+                else:
+                    fields.append("")
+                    for _ in freqs:
+                        fields.append("")
+                fh.write(",".join(fields) + "\n")
+    csv_path = os.path.join(current_app.static_folder, 'ephys_train_sim_stride10.csv')
+    save_train_csv(csv_path, freqs, t_list, G_list, pulse_ratios_all)
+    print("▶️ Saved Train CSV.")
+    # Plot
+    n_freqs = len(freqs)
+    ncols = 2
+    nrows = int(np.ceil(n_freqs / ncols))
+    fig, axes = plt.subplots(2 * nrows, ncols, figsize=(5 * ncols, 3.5 * nrows), squeeze=False)
+    colors = plt.cm.winter(np.linspace(0, 1, n_freqs))
+    for idx, f in enumerate(freqs):
+        row = idx // ncols
+        col = idx % ncols
+        ax_G = axes[2 * row, col]
+        ax_P = axes[2 * row + 1, col]
+        t_i = t_list[idx]
+        G = G_list[idx]
+        ratios = pulse_ratios_all[idx]
+        ax_G.plot(t_i, G, color=colors[idx], lw=1.5)
+        ax_G.set_title(f"{int(f)} Hz")
+        ax_G.set_ylabel("Conductance (pS)")
+        ax_G.set_xlim(0.0, t_i.max())
+        ax_G.grid(True)
+        ax_P.plot(np.arange(1, n_pulses + 1), ratios, marker='o', lw=1.5, color=colors[idx])
+        ax_P.set_xlabel("Pulse number")
+        ax_P.set_ylabel("Ratio (to pulse 1, clipped 0-1)")
+        ax_P.set_xlim(1, n_pulses)
+        ax_P.set_ylim(0.0, 1.0)
+        ax_P.grid(True)
+    total_slots = nrows * ncols
+    for empty in range(n_freqs, total_slots):
+        row = empty // ncols
+        col = empty % ncols
+        axes[2 * row, col].axis("off")
+        axes[2 * row + 1, col].axis("off")
+    fig.suptitle(f"Train simulations ({n_pulses} pulses, width = {pulse_width*1e3:.1f} ms)", fontsize=14)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plot_path = os.path.join(current_app.static_folder, 'train.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print("▶️ Saved Train plot.")
+    return "Train simulation complete."
