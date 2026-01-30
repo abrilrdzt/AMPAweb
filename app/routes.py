@@ -197,36 +197,65 @@ def index():
             plot_file = 'ssi.png'
             csv_file = 'plot_data_ssi_optimized.csv'
         elif sim_type == 'Train':
-            # Frequencies
-            val = request.form.get('Train frequencies (Hz)', default_params['Train frequencies (Hz)']).strip()
-            if not val:
+            # ───────────────────────────────────────────────
+            # Parse and validate Train-specific parameters
+            # ───────────────────────────────────────────────
+            errors_train = []  # collect specific messages for Train
+
+            # Frequencies (must have at least one positive value)
+            freq_input = request.form.get('Train frequencies (Hz)', '').strip()
+            if not freq_input:
+                freq_input = default_params['Train frequencies (Hz)']
+                errors_train.append("No frequencies provided → using default")
+            try:
+                freq_list = [float(x.strip()) for x in freq_input.split(',') if x.strip()]
+                if not freq_list:
+                    raise ValueError("empty after parsing")
+                if any(f <= 0 for f in freq_list):
+                    raise ValueError("frequencies must be > 0 Hz")
+                params['Train frequencies (Hz)'] = freq_input  # keep original string
+            except Exception as e:
+                errors_train.append(f"Invalid frequencies '{freq_input}': {e} → using default")
                 params['Train frequencies (Hz)'] = default_params['Train frequencies (Hz)']
-                errors.append("Missing Train frequencies, using default")
-            else:
-                try:
-                    freq_list = [float(x) for x in val.split(',') if x.strip()]
-                    if any(f <= 0 for f in freq_list):
-                        raise ValueError("Frequencies must be positive")
-                    params['Train frequencies (Hz)'] = val
-                except ValueError as ve:
-                    params['Train frequencies (Hz)'] = default_params['Train frequencies (Hz)']
-                    errors.append(f"Invalid Train frequencies format or values ('{val}'): {str(ve)}, using default")
-            # Scalar params
-            for key in ['Number of pulses', 'Pre time', 'Post time', 'Pulse width']:
-                val = request.form.get(key, '').strip()
+
+            # Number of pulses (integer ≥ 1)
+            npulses_input = request.form.get('Number of pulses', '').strip()
+            try:
+                if not npulses_input:
+                    raise ValueError("missing")
+                n = int(float(npulses_input))
+                if n < 1:
+                    raise ValueError("must be at least 1")
+                params['Number of pulses'] = n
+            except Exception as e:
+                errors_train.append(f"Invalid 'Number of pulses' '{npulses_input}': {e} → using default")
+                params['Number of pulses'] = default_params['Number of pulses']
+
+            # Time parameters (pre, post, pulse width) — must be positive after unit conversion
+            for key, def_key in [
+                ('Pre time', 'Pre time'),
+                ('Post time', 'Post time'),
+                ('Pulse width', 'Pulse width'),
+            ]:
+                val_str = request.form.get(key, '').strip()
                 unit = request.form.get(f'unit_{key}', 'ms')
-                if not val:
-                    params[key] = default_params[key]
-                    errors.append(f"Missing value for {key}, using default")
-                else:
-                    try:
-                        val_f = float(val)
-                        if val_f <= 0:
-                            raise ValueError(f"{key} must be positive")
-                        params[key] = val_f if unit == 's' else val_f / 1000.0
-                    except ValueError as ve:
-                        params[key] = default_params[key]
-                        errors.append(f"Invalid value for {key} ('{val}'): {str(ve)}, using default")
+                try:
+                    if not val_str:
+                        raise ValueError("missing")
+                    val = float(val_str)
+                    if val <= 0:
+                        raise ValueError("must be positive")
+                    converted = val if unit == 's' else val / 1000.0
+                    params[key] = converted
+                except Exception as e:
+                    errors_train.append(f"Invalid '{key}' value '{val_str}' ({e}) → using default")
+                    params[key] = default_params[def_key]
+
+            # Show all errors to user
+            for msg in errors_train:
+                flash(msg)
+
+            # Set the output filenames (like all other sim types)
             plot_file = 'train.png'
             csv_file = 'ephys_train_sim_stride10.csv'
 

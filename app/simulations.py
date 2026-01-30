@@ -597,16 +597,28 @@ def precompute_transition_matrices_TRAIN(params):
 
 def build_train_sweep(freq, params):
     dt = params['∆t']
-    pre = params['Pre time']
-    post = params['Post time']
-    pulse_width = params['Pulse width']
-    n_pulses = params['Number of pulses']
+    pre = max(0.0, params['Pre time'])               # force non-negative
+    post = max(0.0, params['Post time'])
+    pulse_width = max(0.0, params['Pulse width'])
+    n_pulses = max(1, int(params['Number of pulses']))  # at least 1
+
+    if freq <= 0:
+        freq = 1.0  # fallback to avoid inf
 
     isi = 1.0 / freq
     t_between = (n_pulses - 1) * isi
-    tmax = pre + t_between + post
+    tmax = pre + t_between + post + pulse_width  # include last pulse end
+
+    if tmax <= 0 or dt <= 0:
+        raise ValueError(
+            f"Simulation time invalid (tmax={tmax:.6f} s). "
+            f"Check Pre={pre}, Post={post}, Pulse width={pulse_width}, pulses={n_pulses}, freq={freq} Hz."
+        )
 
     nT = int(round(tmax / dt)) + 1
+    if nT < 10:  # arbitrary small minimum to catch tiny times
+        raise ValueError(f"Too few time steps (nT={nT}). Increase durations or decrease ∆t.")
+
     t = np.arange(nT) * dt
     is_on = np.zeros(nT, dtype=np.uint8)
 
