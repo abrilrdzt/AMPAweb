@@ -635,14 +635,8 @@ def simulate_train(M_on, M_off, is_on, GO2, GO3, GO4):
         for j in range(12):
             for k in range(12):
                 P_next[j] += P[k] * M[k, j]
-
-        s = 0.0
-        for i in range(12):
-            v = max(P_next[i], 0.0)
-            P[i] = v
-            s += v
-        if s > 0.0:
-            P /= s
+        P = P_next / np.sum(P_next)
+    
 
         o2, o3, o4 = P[IDX_O2], P[IDX_O3], P[IDX_O4]
         Pop[t] = o2 + o3 + o4
@@ -697,9 +691,18 @@ def run_train(params):
             t1p = t0p + pulse_width
             i0 = int(t0p / dt)
             i1 = int(t1p / dt)
-            ratios[p] = np.max(G[i0:i1])
+            # ensure indices are within bounds
+            i0 = max(0, i0)
+            i1 = min(len(G), i1) if i1 > i0 else i0 + 1
+            if i1 > i0:
+                ratios[p] = np.max(G[i0:i1])
+            else:
+                ratios[p] = 0.0
+        if ratios[0] > 0:
+            ratios /= ratios[0]
+        else:
+            ratios /= 1.0
 
-        ratios /= ratios[0] if ratios[0] > 0 else 1.0
         pulse_ratios_all.append(np.clip(ratios, 0.0, 1.0))
 
     t1 = time_module.perf_counter()
