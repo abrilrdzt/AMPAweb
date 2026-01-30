@@ -1,5 +1,7 @@
 #Sarah Mory 261119392
 #Abril Rodriguez 261175850
+#Ekin Celtikcioglu
+
 
 import numpy as np
 import matplotlib
@@ -70,6 +72,13 @@ default_params = {
     # SSI‐specific
     'Baseline duration': 2.0,    # (s)
     'Baseline agonist concentrations': "1,10,50,100,200,600,1000,1600,2000,2500,5000,10000,12500"
+    
+    #Train-specific
+    'Train frequencies (Hz)': "10,25,50,100,200",
+    'Number of pulses': 20,
+    'Pre time': 0.01,
+    'Post time': 0.05,
+    'Pulse width': 0.001
 }
 
 def make_rates(params):
@@ -572,3 +581,128 @@ def run_ssi(params):
     plt.close()
     print("▶️ Saved SSI plot.")
     return "Steady-State Inactivation simulation complete."
+# ─────────────────────────────────────────────────────────────────────────────
+
+def precompute_transition_matrices_TRAIN(params):
+    rates = make_rates(params)
+    dt = params['∆t']
+
+    Q_off = build_Q_numba(0.0, rates)
+    Q_on  = build_Q_numba(params['Agonist Concentration'], rates)
+
+    M_off = expm(Q_off * dt)
+    M_on  = expm(Q_on * dt)
+
+    return M_on, M_off
+
+def build_train_sweep(freq, params):
+    dt = params['∆t']
+    pre = params['Pre time']
+    post = params['Post time']
+    pulse_width = params['Pulse width']
+    n_pulses = params['Number of pulses']
+
+    isi = 1.0 / freq
+    t_between = (n_pulses - 1) * isi
+    tmax = pre + t_between + post
+
+    nT = int(round(tmax / dt)) + 1
+    t = np.arange(nT) * dt
+    is_on = np.zeros(nT, dtype=np.uint8)
+
+    for p in range(n_pulses):
+        t0 = pre + p * isi
+        t1 = t0 + pulse_width
+        i0 = int(t0 / dt)
+        i1 = int(t1 / dt)
+        is_on[i0:i1] = 1
+
+    return t, is_on
+
+@njit
+def simulate_train(M_on, M_off, is_on, GO2, GO3, GO4):
+    nT = len(is_on)
+    P = np.zeros(12)
+    P[0] = 1.0
+
+    G = np.zeros(nT)
+    Pop = np.zeros(nT)
+
+    for t in range(nT - 1):
+        M = M_on if is_on[t] else M_off
+
+        P_next = np.zeros(12)
+        for j in range(12):
+            for k in range(12):
+                P_next[j] += P[k] * M[k, j]
+
+        s = 0.0
+        for i in range(12):
+            v = max(P_next[i], 0.0)
+            P[i] = v
+            s += v
+        if s > 0.0:
+            P /= s
+
+        o2, o3, o4 = P[IDX_O2], P[IDX_O3], P[IDX_O4]
+        Pop[t] = o2 + o3 + o4
+        G[t]   = o2 * GO2 + o3 * GO3 + o4 * GO4
+
+    return G, Pop
+
+def run_train(params):
+    t0 = time_module.perf_counter()
+
+    # Parse frequencies
+    s = params['Train frequencies (Hz)']
+    freqs = np.array([float(x) for x in s.split(',') if x.strip() != ""])
+
+    print("⏳ Precomputing transition matrices for TRAIN…")
+    M_on, M_off = precompute_transition_matrices_TRAIN(params)
+
+    sweeps = [build_train_sweep(f, params) for f in freqs]
+
+    print("⏳ Running TRAIN simulations…")
+    with parallel_backend("threading", n_jobs=4):
+        results = Parallel()(
+            delayed(simulate_train)(
+                M_on, M_off, is_on,
+                params['Conductance O2'],
+                params['Conductance O3'],
+                params['Conductance O4']
+            )
+            for (_, is_on) in sweeps
+        )
+
+    t_list = [sweeps[i][0] for i in range(len(freqs))]
+    G_list = [r[0] for r in results]
+    P_list = [r[1] for r in results]
+
+    # --------------------------------------------------
+    # Pulse ratios (normalized to pulse 1)
+    # --------------------------------------------------
+    pulse_ratios_all = []
+    dt = params['∆t']
+    pre = params['Pre time']
+    pulse_width = params['Pulse width']
+    n_pulses = params['Number of pulses']
+
+    for idx, f in enumerate(freqs):
+        isi = 1.0 / f
+        G = G_list[idx]
+        ratios = np.zeros(n_pulses)
+
+        for p in range(n_pulses):
+            t0p = pre + p * isi
+            t1p = t0p + pulse_width
+            i0 = int(t0p / dt)
+            i1 = int(t1p / dt)
+            ratios[p] = np.max(G[i0:i1])
+
+        ratios /= ratios[0] if ratios[0] > 0 else 1.0
+        pulse_ratios_all.append(np.clip(ratios, 0.0, 1.0))
+
+    t1 = time_module.perf_counter()
+    print(f"✅ TRAIN completed in {(t1 - t0):.3f}s")
+
+    return freqs, t_list, G_list, P_list, pulse_ratios_all
