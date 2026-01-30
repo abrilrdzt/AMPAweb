@@ -1,6 +1,6 @@
 from flask import render_template, request, send_file, flash, redirect, url_for
 from app import app
-from .simulations import default_params, run_dr, run_ppr_sppr, run_ssi
+from .simulations import default_params, run_dr, run_ppr_sppr, run_ssi, run_train
 import io
 import sys
 from contextlib import redirect_stdout
@@ -196,6 +196,37 @@ def index():
                     errors.append(f"Invalid format for Baseline agonist concentrations ('{val}'), using default: {default_params['Baseline agonist concentrations']}")
             plot_file = 'ssi.png'
             csv_file = 'plot_data_ssi_optimized.csv'
+        elif sim_type == 'Train':
+            # Frequencies
+            val = request.form.get('Train frequencies (Hz)', default_params['Train frequencies (Hz)']).strip()
+            if not val:
+                params['Train frequencies (Hz)'] = default_params['Train frequencies (Hz)']
+                errors.append("Missing Train frequencies, using default")
+            else:
+                try:
+                    _ = [float(x) for x in val.split(',') if x.strip()]
+                    params['Train frequencies (Hz)'] = val
+                except ValueError:
+                    params['Train frequencies (Hz)'] = default_params['Train frequencies (Hz)']
+                    errors.append("Invalid Train frequencies format, using default")
+
+            # Scalar params
+            for key in ['Number of pulses', 'Pre time', 'Post time', 'Pulse width']:
+                val = request.form.get(key, '').strip()
+                unit = request.form.get(f'unit_{key}', 'ms')
+                if not val:
+                    params[key] = default_params[key]
+                    errors.append(f"Missing value for {key}, using default")
+                else:
+                    try:
+                        val_f = float(val)
+                        params[key] = val_f if unit == 's' else val_f / 1000.0
+                    except ValueError:
+                        params[key] = default_params[key]
+                        errors.append(f"Invalid value for {key}, using default")
+
+            plot_file = 'train.png'
+            csv_file = 'ephys_train_sim_stride10.csv'
 
         # Log parsed parameters for debugging
         print(f"Parsed parameters: {params}")
@@ -216,6 +247,8 @@ def index():
                     output = run_ppr_sppr(params, is_sppr=True)
                 elif sim_type == 'Steady-State Inactivation':
                     output = run_ssi(params)
+                elif sim_type == 'Train':
+                    output = run_train(params)
             output += f.getvalue()
         except Exception as e:
             flash(f"Simulation error: {str(e)}")

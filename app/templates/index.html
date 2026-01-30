@@ -68,6 +68,7 @@
                         <option value="Long Paired-Pulse Recovery">Long Paired-Pulse Recovery</option>
                         <option value="Short Paired-Pulse Recovery">Short Paired-Pulse Recovery</option>
                         <option value="Steady-State Inactivation">Steady-State Inactivation</option>
+                        <option value="Train">Train Stimulation</option>
                     </select>
                 </div>
                 {% for key in ['∆t', 'Agonist Concentration', 'Pulse Duration', 'Conductance O2', 'Conductance O3', 'Conductance O4'] %}
@@ -147,6 +148,21 @@
                         </div>
                     {% endfor %}
                 </div>
+                <div id="train-params" style="display: none;">
+                    {% for key in ['Train frequencies (Hz)', 'Number of pulses', 'Pre time', 'Post time', 'Pulse width'] %}
+                        <div class="param">
+                            <label>{{ key }}:</label>
+                            <input type="text" name="{{ key }}"
+                            value="{{ default_params[key] * (1000 if key in ['Pre time', 'Post time', 'Pulse width'] else 1) }}">
+                            {% if key in ['Pre time', 'Post time', 'Pulse width'] %}
+                                <select name="unit_{{ key }}">
+                                    <option value="s">s</option>
+                                    <option value="ms" selected>ms</option>
+                                </select>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
             </div>
             <button type="submit">Run Simulation</button>
         </form>
@@ -182,6 +198,7 @@
             document.getElementById('lppr-params').style.display = this.value === 'Long Paired-Pulse Recovery' ? 'block' : 'none';
             document.getElementById('sppr-params').style.display = this.value === 'Short Paired-Pulse Recovery' ? 'block' : 'none';
             document.getElementById('ssi-params').style.display = this.value === 'Steady-State Inactivation' ? 'block' : 'none';
+            document.getElementById('train-params').style.display = this.value === 'Train' ? 'block' : 'none';
         });
     </script>
 </body>
