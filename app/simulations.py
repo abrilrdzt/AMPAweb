@@ -753,7 +753,7 @@ def run_train(params):
     n_freqs = len(freqs)
     ncols = 2
     nrows = int(np.ceil(n_freqs / ncols))
-    fig, axes = plt.subplots(2 * nrows, ncols, figsize=(5 * ncols, 3.5 * nrows), squeeze=False)
+    fig, axes = plt.subplots(2 * nrows, ncols, figsize=(5.2 * ncols, 5.0 * nrows), squeeze=False)
     colors = plt.cm.winter(np.linspace(0, 1, n_freqs))
     for idx, f in enumerate(freqs):
         row = idx // ncols
@@ -772,7 +772,7 @@ def run_train(params):
         ax_G.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{y * 1e12:.2g}"))
         ax_P.plot(np.arange(1, n_pulses + 1), ratios, marker='o', lw=1.5, color=colors[idx])
         ax_P.set_xlabel("Pulse number")
-        ax_P.set_ylabel("Ratio (to pulse 1, clipped 0-1)")
+        ax_P.set_ylabel("Ratio (to pulse 1,\n" "clipped 0-1)")
         ax_P.set_xlim(1, n_pulses)
         ax_P.set_ylim(0.0, 1.0)
         ax_P.grid(True)
