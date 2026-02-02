@@ -695,7 +695,7 @@ def run_train(params):
         for p in range(n_pulses):
             t0p = pre + p * isi
             t1p = t0p + pulse_width
-            i0 = int(round(t0p / dt))  # Safer rounding
+            i0 = int(round(t0p / dt))  
             i1 = int(round(t1p / dt))
             i0 = max(0, i0)
             i1 = min(len(G), i1)
@@ -750,10 +750,18 @@ def run_train(params):
     save_train_csv(csv_path, freqs, t_list, G_list, pulse_ratios_all)
     print("▶️ Saved Train CSV.")
     # Plot
+    if G_list:
+        global_max_G = max(G.max() for G in G_list)
+        y_max = global_max_G * 1.3
+        y_min = 0.0
+    else:
+        y_max = 25e-12
+        y_min = 0.0
+        
     n_freqs = len(freqs)
     ncols = 2
     nrows = int(np.ceil(n_freqs / ncols))
-    fig, axes = plt.subplots(2 * nrows, ncols, figsize=(5 * ncols, 3.5 * nrows), squeeze=False)
+    fig, axes = plt.subplots(2 * nrows, ncols, figsize=(5 * ncols, 3.5 * nrows), squeeze=False, sharey='row')
     colors = plt.cm.winter(np.linspace(0, 1, n_freqs))
     for idx, f in enumerate(freqs):
         row = idx // ncols
@@ -763,17 +771,25 @@ def run_train(params):
         t_i = t_list[idx]
         G = G_list[idx]
         ratios = pulse_ratios_all[idx]
+        
         ax_G.plot(t_i, G, color=colors[idx], lw=1.5)
         ax_G.set_title(f"{int(f)} Hz")
         ax_G.set_ylabel("Conductance (pS)")
-        ax_G.set_xlim(0.0, t_i.max())
-        ax_G.grid(True)
+        # Scaling y-ticks to pS 
+        ax_G.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{y * 1e12:.2g}"))
+        ax_G.set_ylim(y_min, y_max)
+        ax_G.set_xlim(0, t_i.max())
+        ax_G.grid(True, alpha=0.7
+        
+        
         ax_P.plot(np.arange(1, n_pulses + 1), ratios, marker='o', lw=1.5, color=colors[idx])
         ax_P.set_xlabel("Pulse number")
-        ax_P.set_ylabel("Ratio (to pulse 1, clipped 0-1)")
-        ax_P.set_xlim(1, n_pulses)
-        ax_P.set_ylim(0.0, 1.0)
-        ax_P.grid(True)
+        ax_P.set_ylabel("Ratio (to pulse 1)")
+        ax_P.set_xlim(0.5, n_pulses + 0.5)
+        ax_P.set_ylim(-0.02, 1.05)
+        ax_P.set_yticks(np.arange(0, 1.1, 0.2))
+        ax_P.grid(True, alpha=0.7)
+                  
     total_slots = nrows * ncols
     for empty in range(n_freqs, total_slots):
         row = empty // ncols
