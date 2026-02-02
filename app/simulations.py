@@ -13,6 +13,8 @@ from joblib import Parallel, delayed, parallel_backend
 from scipy.linalg import expm
 import time as time_module
 from collections import OrderedDict
+from flask import current_app
+import os
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -232,8 +234,6 @@ def run_dr(params):
     max_probs = open_traces.max(axis=1)
 
     # Save CSV
-    from flask import current_app
-    import os
     static_path = os.path.join(current_app.static_folder, 'plot_data_dose_response.csv')
     with open(static_path, 'w', newline='') as f:
         w = csv.writer(f)
@@ -428,8 +428,6 @@ def run_ppr_sppr(params, is_sppr=False):
     plt.gcf().text(0.82, 0.08, param_text, fontsize=10, ha='right', bbox=dict(facecolor='white', alpha=0.8))
     plt.tight_layout()
     plt.subplots_adjust(hspace=0.3)
-    from flask import current_app
-    import os
 
     static_path = os.path.join(current_app.static_folder, 'ppr_conductance_ratio_vs_interval.csv' if not is_sppr else 'sppr_conductance_ratio_vs_interval.csv')
     with open(static_path, 'w', newline='') as file:
@@ -547,8 +545,7 @@ def run_ssi(params):
     print(f"✅ Completed SSI runs in {(t1 - total_start):.3f}s")
 
     # Save CSV
-    from flask import current_app
-    import os
+
     static_path = os.path.join(current_app.static_folder, 'plot_data_ssi_optimized.csv')
     with open(static_path, 'w', newline='') as f:
         w = csv.writer(f)
@@ -657,8 +654,6 @@ def simulate_train(M_on, M_off, is_on, GO2, GO3, GO4):
     return G, Pop
 
 def run_train(params):
-    from flask import current_app
-    import os
     t0 = time_module.perf_counter()
     # Parse frequencies
     s = params['Train frequencies (Hz)']
