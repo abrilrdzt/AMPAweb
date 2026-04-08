@@ -3,40 +3,32 @@
 <head>
     <title>AMPA Receptor Kinetic Simulator</title>
     <style>
-        body { font-family: 'Playfair Display', sans-serif; margin: 20px; background-color: #C8D8E1;color: #2C2C2C; }
-        h1, h2, h3, h4, h5, h6 {
-        color: #2B6777;}
+        body { font-family: 'Playfair Display', sans-serif; margin: 20px; background-color: #C8D8E1; color: #2C2C2C; }
+        h1, h2, h3, h4, h5, h6 { color: #2B6777; }
         .container { width: 100%; max-width: none; margin: 0 auto; padding: 0; }
-        .section { margin: 0 auto; padding: 20px 20px;background-color: white; border-radius: 0; width: 100vw; box-sizing: border-box;}
-        .tall-section {min-height: 85vh;}
-        .section + .section {margin-top: 40px;}
+        .section { margin: 0 auto; padding: 20px 20px; background-color: white; border-radius: 0; width: 100vw; box-sizing: border-box; }
+        .tall-section { min-height: 85vh; }
+        .section + .section { margin-top: 40px; }
         .param-group { display: flex; flex-wrap: wrap; gap: 10px; }
-        .param { display: flex; align-items: center; gap: 5px; }
-        label { min-width: 200px; }
+        .param { display: flex; align-items: center; gap: 5px; margin-bottom: 8px; }
+        label { min-width: 380px; }
         input[type="text"], select { padding: 5px; }
         button { padding: 10px 20px; background-color: #2B6777; color: white; border: none; border-radius: 5px; cursor: pointer; }
         button:hover { background-color: #225262; }
         .console { background-color: #f8f8f8; padding: 10px; height: 150px; overflow-y: scroll; border: 1px solid #ccc; }
         .error { color: red; }
         img { max-width: 100%; }
-        .plot-image {
-        display: block;
-        width: 100vw;
-        height: auto;
-        margin: 0 auto;}
-        body.fullscreen-plot {
-        margin: 0;
-        padding: 0;}
-        .diagram-container {position: relative; max-width: 1100px; width: 100%; margin: 30px auto 0 auto;}
-        .ampa-diagram {width: 100%; height: auto; display: block;transform: scale(1.1); transform-origin: center;}
-        .rate-input {position: absolute;width: 75px;padding: 2px;font-size: 12px;text-align: center;}
-        .rate-unit {position: absolute;font-size: 13px;background-color: rgba(255, 255, 255, 0.8);padding-left: 2px;}
-        .bottom-right-name { position: fixed;bottom: 10px;right: 10px;color: #2B6777;font-family: 'Playfair Display', sans-serif;background-color: rgba(255, 255, 255, 0.7);padding: 5px 10px;border-radius: 5px;
-        z-index: 1000; font-size: 14px;}
-      
+        .plot-image { display: block; width: 100vw; height: auto; margin: 0 auto; }
+        body.fullscreen-plot { margin: 0; padding: 0; }
+        .diagram-container { position: relative; max-width: 1100px; width: 100%; margin: 30px auto 0 auto; }
+        .ampa-diagram { width: 100%; height: auto; display: block; transform: scale(1.1); transform-origin: center; }
+        .rate-input { position: absolute; width: 75px; padding: 2px; font-size: 12px; text-align: center; }
+        .rate-unit { position: absolute; font-size: 13px; background-color: rgba(255, 255, 255, 0.8); padding-left: 2px; }
+        .bottom-right-name { position: fixed; bottom: 10px; right: 10px; color: #2B6777; font-family: 'Playfair Display', sans-serif; background-color: rgba(255, 255, 255, 0.7); padding: 5px 10px; border-radius: 5px; z-index: 1000; font-size: 14px; }
     </style>
 </head>
 <body>
+
 {% with messages = get_flashed_messages() %}
     {% if messages %}
         <ul class="error">
@@ -46,127 +38,295 @@
         </ul>
     {% endif %}
 {% endwith %}
-    <div class="container">
-        <h1>AMPA Receptor Kinetic Simulator</h1>
-        <form method="POST">
-            <div class="section tall-section">
-                <h2>Step 1: Transition-Rate Parameters</h2>
-                <div class="diagram-container">
-                    <img src="{{ url_for('static', filename='ampa_diagram.png') }}" alt="AMPA Diagram" class="ampa-diagram">
-                    {% for key, (x, y) in rate_coords.items() %}
-                        <input type="text" name="{{ key }}" value="{{ default_params[key] }}" class="rate-input" style="left: {{ x * 1.5 }}px; top: {{ y * 1.5 }}px;">
-                        <span class="rate-unit" style="left: {{ (x + 60) * 1.5 }}px; top: {{ (y + 5) * 1.5 }}px;">{{ get_unit_for_rate(key) }}</span>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="section">
-                <h2>Step 2: Choose Simulation & General Parameters</h2>
-                <div class="param">
-                    <label>Simulation Type:</label>
-                    <select name="simulation_type">
-                        <option value="Dose Response">Dose Response</option>
-                        <option value="Long Paired-Pulse Recovery">Long Paired-Pulse Recovery</option>
-                        <option value="Short Paired-Pulse Recovery">Short Paired-Pulse Recovery</option>
-                        <option value="Steady-State Inactivation">Steady-State Inactivation</option>
-                        <option value="Train">Train Simulation</option>
-                    </select>
-                </div>
-                {% for key in ['∆t', 'Agonist Concentration', 'Pulse Duration', 'Conductance O2', 'Conductance O3', 'Conductance O4'] %}
-                    <div class="param">
-                        <label>{{ key }}:</label>
-                        <input type="text" name="{{ key }}" value="{{ default_params[key] * (1000 if key in ['∆t', 'Pulse Duration'] else 1000 if key == 'Agonist Concentration' else 1e12 if key in ['Conductance O2', 'Conductance O3', 'Conductance O4'] else 1) }}">
-                        <select name="unit_{{ key }}">
-                            {% if key in ['∆t', 'Pulse Duration'] %}
-                                <option value="s">s</option>
-                                <option value="ms" selected>ms</option>
-                            {% elif key == 'Agonist Concentration' %}
-                                <option value="M">M</option>
-                                <option value="mM" selected>mM</option>
-                            {% else %}
-                                <option value="S">S</option>
-                                <option value="pS" selected>pS</option>
-                            {% endif %}
-                        </select>
-                    </div>
+
+<div class="container">
+    <h1>AMPA Receptor Kinetic Simulator</h1>
+    <form method="POST">
+
+        <!-- ═══════════════════════════════════════════════════════════
+             STEP 1: Transition-Rate Parameters
+        ════════════════════════════════════════════════════════════ -->
+        <div class="section tall-section">
+            <h2>Step 1: Transition-Rate Parameters</h2>
+            <div class="diagram-container">
+                <img src="{{ url_for('static', filename='ampa_diagram.png') }}" alt="AMPA Diagram" class="ampa-diagram">
+                {% for key, (x, y) in rate_coords.items() %}
+                    <input type="text" name="{{ key }}" value="{{ default_params[key] }}" class="rate-input"
+                           style="left: {{ x * 1.5 }}px; top: {{ y * 1.5 }}px;">
+                    <span class="rate-unit"
+                          style="left: {{ (x + 60) * 1.5 }}px; top: {{ (y + 5) * 1.5 }}px;">{{ get_unit_for_rate(key) }}</span>
                 {% endfor %}
             </div>
-            <div class="section" id="specific-params">
-                <h2>Step 3: Simulation-Specific Parameters</h2>
-                <div id="dr-params">
-                    {% for key in ['Maximum time', 'Agonist starting time', 'Agonist ending time', 'Agonist concentrations'] %}
-                        <div class="param">
-                            <label>{{ key }}:</label>
-                            <input type="text" name="{{ key }}" value="{{ default_params[key] * (1000 if key in ['Maximum time', 'Agonist starting time', 'Agonist ending time'] else 1) }}">
-                            {% if key in ['Maximum time', 'Agonist starting time', 'Agonist ending time'] %}
-                                <select name="unit_{{ key }}">
-                                    <option value="s">s</option>
-                                    <option value="ms" selected>ms</option>
-                                </select>
-                            {% endif %}
-                        </div>
-                    {% endfor %}
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             STEP 2: Simulation type + parameters shared by ALL protocols
+             (∆t and the three open-state conductances only)
+        ════════════════════════════════════════════════════════════ -->
+        <div class="section">
+            <h2>Step 2: Choose Simulation &amp; Shared Parameters</h2>
+
+            <div class="param">
+                <label>Simulation Type:</label>
+                <select name="simulation_type" id="simulation_type">
+                    <option value="Dose Response">Dose Response</option>
+                    <option value="Long Paired-Pulse Recovery">Long Paired-Pulse Recovery</option>
+                    <option value="Short Paired-Pulse Recovery">Short Paired-Pulse Recovery</option>
+                    <option value="Steady-State Inactivation">Steady-State Inactivation</option>
+                    <option value="Train">Train Simulation</option>
+                </select>
+            </div>
+
+            <!-- ∆t -->
+            <div class="param">
+                <label>Time Step (∆t) — simulation resolution:</label>
+                <input type="text" name="∆t" value="{{ default_params['∆t'] * 1000 }}">
+                <select name="unit_∆t">
+                    <option value="s">s</option>
+                    <option value="ms" selected>ms</option>
+                </select>
+            </div>
+
+            <!-- Conductances -->
+            <div class="param">
+                <label>Single-channel Conductance — O2 state (2 subunits open):</label>
+                <input type="text" name="Conductance O2" value="{{ default_params['Conductance O2'] * 1e12 }}">
+                <select name="unit_Conductance O2">
+                    <option value="S">S</option>
+                    <option value="pS" selected>pS</option>
+                </select>
+            </div>
+            <div class="param">
+                <label>Single-channel Conductance — O3 state (3 subunits open):</label>
+                <input type="text" name="Conductance O3" value="{{ default_params['Conductance O3'] * 1e12 }}">
+                <select name="unit_Conductance O3">
+                    <option value="S">S</option>
+                    <option value="pS" selected>pS</option>
+                </select>
+            </div>
+            <div class="param">
+                <label>Single-channel Conductance — O4 state (4 subunits open):</label>
+                <input type="text" name="Conductance O4" value="{{ default_params['Conductance O4'] * 1e12 }}">
+                <select name="unit_Conductance O4">
+                    <option value="S">S</option>
+                    <option value="pS" selected>pS</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             STEP 3: Simulation-Specific Parameters
+        ════════════════════════════════════════════════════════════ -->
+        <div class="section" id="specific-params">
+            <h2>Step 3: Simulation-Specific Parameters</h2>
+
+            <!-- ─── DOSE RESPONSE ──────────────────────────────────── -->
+            <div id="dr-params">
+                <div class="param">
+                    <label>Pulse Duration (how long agonist is applied per concentration):</label>
+                    <input type="text" name="Pulse Duration" value="{{ default_params['Pulse Duration'] * 1000 }}">
+                    <select name="unit_Pulse Duration">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
                 </div>
-                <div id="lppr-params" style="display: none;">
-                    {% for key in ['Starting time (baseline pulse) Long Paired Pulse', 'Buffer time', 'Pulse intervals (long)'] %}
-                        <div class="param">
-                            <label>{{ key }}:</label>
-                            <input type="text" name="{{ key }}" value="{{ default_params[key] * (1000 if key in ['Starting time (baseline pulse) Long Paired Pulse', 'Buffer time'] else 1) }}">
-                            {% if key in ['Starting time (baseline pulse) Long Paired Pulse', 'Buffer time'] %}
-                                <select name="unit_{{ key }}">
-                                    <option value="s">s</option>
-                                    <option value="ms" selected>ms</option>
-                                </select>
-                            {% endif %}
-                        </div>
-                    {% endfor %}
+                <div class="param">
+                    <label>Maximum Simulation Time:</label>
+                    <input type="text" name="Maximum time" value="{{ default_params['Maximum time'] * 1000 }}">
+                    <select name="unit_Maximum time">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
                 </div>
-                <div id="sppr-params" style="display: none;">
-                    {% for key in ['Starting time (baseline pulse) Short Paired Pulse', 'Buffer time', 'Pulse intervals (short)'] %}
-                        <div class="param">
-                            <label>{{ key }}:</label>
-                            <input type="text" name="{{ key }}" value="{{ default_params[key] * (1000 if key in ['Starting time (baseline pulse) Short Paired Pulse', 'Buffer time'] else 1) }}">
-                            {% if key in ['Starting time (baseline pulse) Short Paired Pulse', 'Buffer time'] %}
-                                <select name="unit_{{ key }}">
-                                    <option value="s">s</option>
-                                    <option value="ms" selected>ms</option>
-                                </select>
-                            {% endif %}
-                        </div>
-                    {% endfor %}
+                <div class="param">
+                    <label>Agonist Pulse Start Time:</label>
+                    <input type="text" name="Agonist starting time" value="{{ default_params['Agonist starting time'] * 1000 }}">
+                    <select name="unit_Agonist starting time">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
                 </div>
-                <div id="ssi-params" style="display: none;">
-                    {% for key in ['Baseline duration', 'Baseline agonist concentrations'] %}
-                        <div class="param">
-                            <label>{{ key }}:</label>
-                            <input type="text" name="{{ key }}" value="{{ default_params[key] * (1000 if key == 'Baseline duration' else 1) }}">
-                            {% if key == 'Baseline duration' %}
-                                <select name="unit_{{ key }}">
-                                    <option value="s">s</option>
-                                    <option value="ms" selected>ms</option>
-                                </select>
-                            {% endif %}
-                        </div>
-                    {% endfor %}
+                <div class="param">
+                    <label>Agonist Pulse End Time:</label>
+                    <input type="text" name="Agonist ending time" value="{{ default_params['Agonist ending time'] * 1000 }}">
+                    <select name="unit_Agonist ending time">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
                 </div>
-                <div id="train-params" style="display: none;">
-                    {% for key in ['Train frequencies (Hz)', 'Number of pulses', 'Pre time', 'Post time', 'Pulse width'] %}
-                        <div class="param">
-                            <label>{{ key }}:</label>
-                            <input type="text" name="{{ key }}"
-                            value="{{ default_params[key] * (1000 if key in ['Pre time', 'Post time', 'Pulse width'] else 1) }}">
-                            {% if key in ['Pre time', 'Post time', 'Pulse width'] %}
-                                <select name="unit_{{ key }}">
-                                    <option value="s">s</option>
-                                    <option value="ms" selected>ms</option>
-                                </select>
-                            {% endif %}
-                        </div>
-                    {% endfor %}
+                <div class="param">
+                    <label>Concentrations to Sweep — DR curve (µM, comma-separated):</label>
+                    <input type="text" name="Agonist concentrations" value="{{ default_params['Agonist concentrations'] }}" style="width: 400px;">
                 </div>
             </div>
-            <button type="submit">Run Simulation</button>
-        </form>
-        <div class="results-container">
+
+            <!-- ─── LONG PAIRED-PULSE RECOVERY ─────────────────────── -->
+            <div id="lppr-params" style="display: none;">
+                <div class="param">
+                    <label>Duration of Conditioning (1st) Pulse:</label>
+                    <input type="text" name="Starting time (baseline pulse) Long Paired Pulse"
+                           value="{{ default_params['Starting time (baseline pulse) Long Paired Pulse'] * -1000 }}">
+                    <select name="unit_Starting time (baseline pulse) Long Paired Pulse">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
+                </div>
+                <div class="param">
+                    <label>Duration of Test (2nd) Pulse:</label>
+                    <input type="text" name="Pulse Duration" value="{{ default_params['Pulse Duration'] * 1000 }}">
+                    <select name="unit_Pulse Duration">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
+                </div>
+                <div class="param">
+                    <label>Agonist Concentration (applied to both 1st and 2nd pulses):</label>
+                    <input type="text" name="Agonist Concentration" value="{{ default_params['Agonist Concentration'] * 1000 }}">
+                    <select name="unit_Agonist Concentration">
+                        <option value="M">M</option>
+                        <option value="mM" selected>mM</option>
+                    </select>
+                </div>
+                <div class="param">
+                    <label>Buffer Time (silence recorded after 2nd pulse ends):</label>
+                    <input type="text" name="Buffer time" value="{{ default_params['Buffer time'] * 1000 }}">
+                    <select name="unit_Buffer time">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
+                </div>
+                <div class="param">
+                    <label>Inter-Pulse Intervals to Test (ms, comma-separated):</label>
+                    <input type="text" name="Pulse intervals (long)" value="{{ default_params['Pulse intervals (long)'] }}" style="width: 400px;">
+                </div>
+            </div>
+
+            <!-- ─── SHORT PAIRED-PULSE RECOVERY ───────────────────── -->
+            <div id="sppr-params" style="display: none;">
+                <div class="param">
+                    <label>Duration of Conditioning (1st) Pulse:</label>
+                    <input type="text" name="Starting time (baseline pulse) Short Paired Pulse"
+                           value="{{ default_params['Starting time (baseline pulse) Short Paired Pulse'] * -1000 }}">
+                    <select name="unit_Starting time (baseline pulse) Short Paired Pulse">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
+                </div>
+                <div class="param">
+                    <label>Duration of Test (2nd) Pulse:</label>
+                    <input type="text" name="Pulse Duration" value="{{ default_params['Pulse Duration'] * 1000 }}">
+                    <select name="unit_Pulse Duration">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
+                </div>
+                <div class="param">
+                    <label>Agonist Concentration (applied to both 1st and 2nd pulses):</label>
+                    <input type="text" name="Agonist Concentration" value="{{ default_params['Agonist Concentration'] * 1000 }}">
+                    <select name="unit_Agonist Concentration">
+                        <option value="M">M</option>
+                        <option value="mM" selected>mM</option>
+                    </select>
+                </div>
+                <div class="param">
+                    <label>Buffer Time (silence recorded after 2nd pulse ends):</label>
+                    <input type="text" name="Buffer time" value="{{ default_params['Buffer time'] * 1000 }}">
+                    <select name="unit_Buffer time">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
+                </div>
+                <div class="param">
+                    <label>Inter-Pulse Intervals to Test (ms, comma-separated):</label>
+                    <input type="text" name="Pulse intervals (short)" value="{{ default_params['Pulse intervals (short)'] }}" style="width: 400px;">
+                </div>
+            </div>
+
+            <!-- ─── STEADY-STATE INACTIVATION ──────────────────────── -->
+            <div id="ssi-params" style="display: none;">
+                <div class="param">
+                    <label>Pre-conditioning Duration (steady-state baseline agonist exposure):</label>
+                    <input type="text" name="Baseline duration" value="{{ default_params['Baseline duration'] * 1000 }}">
+                    <select name="unit_Baseline duration">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
+                </div>
+                <div class="param">
+                    <label>Test Pulse Duration:</label>
+                    <input type="text" name="Pulse Duration" value="{{ default_params['Pulse Duration'] * 1000 }}">
+                    <select name="unit_Pulse Duration">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
+                </div>
+                <div class="param">
+                    <label>Test Pulse Agonist Concentration (fixed, high — same for all conditions):</label>
+                    <input type="text" name="Agonist Concentration" value="{{ default_params['Agonist Concentration'] * 1000 }}">
+                    <select name="unit_Agonist Concentration">
+                        <option value="M">M</option>
+                        <option value="mM" selected>mM</option>
+                    </select>
+                </div>
+                <div class="param">
+                    <label>Pre-conditioning Concentrations — SSI curve (nM, comma-separated):</label>
+                    <input type="text" name="Baseline agonist concentrations" value="{{ default_params['Baseline agonist concentrations'] }}" style="width: 400px;">
+                </div>
+            </div>
+
+            <!-- ─── TRAIN ───────────────────────────────────────────── -->
+            <div id="train-params" style="display: none;">
+                <div class="param">
+                    <label>Pulse Agonist Concentration (applied during each pulse in the train):</label>
+                    <input type="text" name="Agonist Concentration" value="{{ default_params['Agonist Concentration'] * 1000 }}">
+                    <select name="unit_Agonist Concentration">
+                        <option value="M">M</option>
+                        <option value="mM" selected>mM</option>
+                    </select>
+                </div>
+                <div class="param">
+                    <label>Individual Pulse Duration (width of each agonist pulse):</label>
+                    <input type="text" name="Pulse width" value="{{ default_params['Pulse width'] * 1000 }}">
+                    <select name="unit_Pulse width">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
+                </div>
+                <div class="param">
+                    <label>Stimulation Frequencies (Hz, comma-separated):</label>
+                    <input type="text" name="Train frequencies (Hz)" value="{{ default_params['Train frequencies (Hz)'] }}">
+                </div>
+                <div class="param">
+                    <label>Number of Pulses per Train:</label>
+                    <input type="text" name="Number of pulses" value="{{ default_params['Number of pulses'] }}">
+                </div>
+                <div class="param">
+                    <label>Pre-train Baseline Duration (silence before first pulse):</label>
+                    <input type="text" name="Pre time" value="{{ default_params['Pre time'] * 1000 }}">
+                    <select name="unit_Pre time">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
+                </div>
+                <div class="param">
+                    <label>Post-train Recording Duration (silence after last pulse):</label>
+                    <input type="text" name="Post time" value="{{ default_params['Post time'] * 1000 }}">
+                    <select name="unit_Post time">
+                        <option value="s">s</option>
+                        <option value="ms" selected>ms</option>
+                    </select>
+                </div>
+            </div>
+
+        </div><!-- end Step 3 -->
+
+        <button type="submit">Run Simulation</button>
+    </form>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         RESULTS
+    ════════════════════════════════════════════════════════════ -->
+    <div class="results-container">
         {% if output %}
             <div class="params-container">
                 <h2>Console Output</h2>
@@ -192,17 +352,20 @@
             </div>
         {% endif %}
     </div>
-    <script>
-        document.querySelector('select[name="simulation_type"]').addEventListener('change', function() {
-            document.getElementById('dr-params').style.display = this.value === 'Dose Response' ? 'block' : 'none';
-            document.getElementById('lppr-params').style.display = this.value === 'Long Paired-Pulse Recovery' ? 'block' : 'none';
-            document.getElementById('sppr-params').style.display = this.value === 'Short Paired-Pulse Recovery' ? 'block' : 'none';
-            document.getElementById('ssi-params').style.display = this.value === 'Steady-State Inactivation' ? 'block' : 'none';
-            document.getElementById('train-params').style.display = this.value === 'Train' ? 'block' : 'none';
-        });
-    </script>
-</body>
+</div>
+
+<script>
+    document.getElementById('simulation_type').addEventListener('change', function () {
+        document.getElementById('dr-params').style.display   = this.value === 'Dose Response'              ? 'block' : 'none';
+        document.getElementById('lppr-params').style.display = this.value === 'Long Paired-Pulse Recovery'  ? 'block' : 'none';
+        document.getElementById('sppr-params').style.display = this.value === 'Short Paired-Pulse Recovery' ? 'block' : 'none';
+        document.getElementById('ssi-params').style.display  = this.value === 'Steady-State Inactivation'   ? 'block' : 'none';
+        document.getElementById('train-params').style.display= this.value === 'Train'                       ? 'block' : 'none';
+    });
+</script>
+
 <footer class="bottom-right-name">
-  Created by Abril Rodriguez, Sarah Mory and Ekin Celtikcioglu
+    Created by Abril Rodriguez, Sarah Mory and Ekin Celtikcioglu
 </footer>
+</body>
 </html>
